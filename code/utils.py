@@ -561,7 +561,7 @@ def get_trajectories(dataset, config, sess, tester):
   if config.is_actev:
     traj_class_correct_cat = [[] for i in range(len(config.traj_cats))]
 
-  for mybatch in tqdm.tqdm(dataset.get_batches(1, total=num_batches_per_epoch, ascii=True):
+  for mybatch in tqdm.tqdm(1, total=num_batches_per_epoch, ascii=True):
 
     # [N,pred_len, 2]
     # here the output is relative output
