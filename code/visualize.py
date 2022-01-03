@@ -137,7 +137,7 @@ def main(args):
     
     perf = utils.evaluate(test_data, args, sess, tester)
     
-    output = utils.get_trajectories(test_data, args, sess)
+    output = utils.get_trajectories(test_data, args, sess, tester)
     
     print(output[0])
     print("---------------------------------------------------------------------")
