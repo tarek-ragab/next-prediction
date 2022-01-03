@@ -2,13 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-"""Test person prediction model.
-See README for running instructions.
-"""
-
 import argparse
 import tensorflow as tf
 import os
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 # the following will still have colocation debug info
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
@@ -16,7 +13,6 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 import models
 
 import utils
-
 
 parser = argparse.ArgumentParser()
 
@@ -138,16 +134,14 @@ def main(args):
 
     # load the graph and variables
     tester = models.Tester(model, args, sess)
-
+    
     perf = utils.evaluate(test_data, args, sess, tester)
-
-  print("performance:")
-  numbers = []
-  for k in sorted(perf.keys()):
-    print("%s, %s" % (k, perf[k]))
-    numbers.append("%s" % perf[k])
-  print(" ".join(sorted(perf.keys())))
-  print(" ".join(numbers))
+    
+    output = utils.get_trajectories(test_data, args, sess)
+    
+    print(output[0])
+    print("---------------------------------------------------------------------")
+    print(output[1])
 
 
 if __name__ == "__main__":
