@@ -534,6 +534,101 @@ def evaluate(dataset, config, sess, tester):
   return p
 
 
+def get_trajectories(dataset, config, sess, tester):
+  """gets the tajectories using the tester model.
+
+  Args:
+    dataset: the Dataset instance
+    config: arguments
+    sess: tensorflow session
+    tester: the Tester instance
+
+  Returns:
+    trajectories.
+  """
+
+  grid1 = []
+  grid2 = []
+
+  # BG class is also used for evaluate
+  future_act_scores = {actid: [] for actid in config.activity2id.values()}
+  future_act_labels = {actid: [] for actid in config.activity2id.values()}
+  act_ap = None
+
+  num_batches_per_epoch = dataset.num_examples
+
+  traj_class_correct = []
+  if config.is_actev:
+    traj_class_correct_cat = [[] for i in range(len(config.traj_cats))]
+
+  for mybatch in tqdm.tqdm(dataset.get_batches(1, full=True, shuffle=False), total=num_batches_per_epoch, ascii=True):
+
+    # [N,pred_len, 2]
+    # here the output is relative output
+    pred_out, future_act, grid_pred_1, grid_pred_2, traj_class_logits, _ = tester.step(sess, mybatch)
+
+    _, batch = mybatch
+
+    this_actual_batch_size = batch.data["original_batch_size"]
+
+    # activity location prediction
+    grid_pred_1 = np.argmax(grid_pred_1, axis=1)
+    grid_pred_2 = np.argmax(grid_pred_2, axis=1)
+
+    for i in range(len(batch.data["pred_grid_class"])):
+      gt_grid1_pred_class = batch.data["pred_grid_class"][i][0, -1]
+      gt_grid2_pred_class = batch.data["pred_grid_class"][i][1, -1]
+
+      grid1.append(grid_pred_1[i] == gt_grid1_pred_class)
+      grid2.append(grid_pred_2[i] == gt_grid2_pred_class)
+
+    if config.add_activity:
+      # get the mean AP
+      for i in range(len(batch.data["future_activity_onehot"])):
+        # [num_act]
+        this_future_act_labels = batch.data["future_activity_onehot"][i]
+        for j in range(len(this_future_act_labels)):
+          actid = j
+          future_act_labels[actid].append(this_future_act_labels[j])
+          # for checking AP using the cur act as
+          future_act_scores[actid].append(future_act[i, j])
+
+    for i, (obs_traj_gt, pred_traj_gt) in enumerate(zip(batch.data["obs_traj"], batch.data["pred_traj"])):
+      if i >= this_actual_batch_size:
+        break
+      # the output is relative coordinates
+      this_pred_out = pred_out[i][:, :2]  # [T2, 2]
+      # [T2,2]
+      this_pred_out_abs = relative_to_abs(this_pred_out, obs_traj_gt[-1])
+      # get the errors
+      assert this_pred_out_abs.shape == this_pred_out.shape, (
+          this_pred_out_abs.shape, this_pred_out.shape)
+
+      if config.multi_decoder:
+        this_traj_class = np.argmax(traj_class_logits[i])
+        traj_correct = int(this_traj_class ==
+                           batch.data["traj_cat"][i])
+        traj_class_correct.append(traj_correct)
+
+        traj_class_correct_cat[batch.data["traj_cat"][i]].append(traj_correct)
+
+  if config.add_activity:
+    act_ap = []
+    actids = []
+    for actid in future_act_labels:
+      list_ = [{"score": future_act_scores[actid][i],
+                "label": future_act_labels[actid][i]}
+               for i in range(len(future_act_labels[actid]))]
+      ap = compute_ap(list_)
+
+      act_ap.append(ap)
+      actids.append(actid)
+
+    act_ap = np.mean(act_ap)
+
+  return pred_out, future_act
+
+
 class Dataset(object):
   """Class for batching during training and testing."""
 
